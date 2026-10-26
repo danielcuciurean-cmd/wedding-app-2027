@@ -4,7 +4,7 @@ import { h, formModal, confirmDialog, modal, toast } from '../ui.js';
 const SHAPES = [['round', 'Rotundă'], ['rect', 'Dreptunghiulară'], ['honor', 'Masă de onoare']];
 const SIZE = { round: [110, 110], rect: [160, 80], honor: [260, 70] };
 export let noAutoRender = false;
-let selTable = '', selGuest = '', onRedraw = null;
+let selTable = '', selGuest = '', onRedraw = null, moveMode = false;
 
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ro', { numeric: true });
 const seated = id => data('guests').filter(g => g.tableId === id && g.rsvp !== 'refuzat');
@@ -37,8 +37,30 @@ function assignGroup(gr) {
   ], {}, v => assign(ids, v.tableId));
 }
 
+function pickGuests(t) {
+  const groups = Object.fromEntries(data('groups').map(g => [g.id, g.name]));
+  const free = data('guests').filter(g => g.rsvp !== 'refuzat' && !g.tableId).sort(byName);
+  if (!free.length) return toast('Nu mai sunt invitați nealocați');
+  const picked = new Set();
+  const list = h('div', { class: 'picklist' });
+  const q = h('input', { type: 'search', placeholder: 'Caută invitat…' });
+  const btn = h('button', { class: 'btn primary', type: 'button' }, 'Alocă');
+  const upd = () => { btn.textContent = `Alocă (${picked.size})`; };
+  const draw = () => {
+    const term = q.value.toLowerCase();
+    list.replaceChildren(...free.filter(g => !term || g.name.toLowerCase().includes(term) || (groups[g.groupId] || '').toLowerCase().includes(term)).map(g =>
+      h('label', { class: 'check pick' }, h('input', { type: 'checkbox', checked: picked.has(g.id), onchange: e => { e.target.checked ? picked.add(g.id) : picked.delete(g.id); upd(); } }),
+        h('span', {}, g.name, h('span', { class: 'muted small' }, groups[g.groupId] ? ` · ${groups[g.groupId]}` : '')))));
+  };
+  q.addEventListener('input', draw); draw(); upd();
+  const m = modal(`Alocă la ${t.name} (${Math.max(t.capacity - seated(t.id).length, 0)} libere)`, h('div', {}, q, list, h('div', { class: 'row end' }, btn)));
+  btn.addEventListener('click', async () => { if (!picked.size) return; m.close(); await assign([...picked], t.id); });
+}
+
 function dragTable(e, t, el) {
   if (e.button > 0) return;
+  if (e.pointerType === 'touch' && !moveMode) return; // pe telefon: atingere = selectare, mutarea se activează explicit
+  el._h = true;
   selTable = t.id;
   const sx = e.clientX, sy = e.clientY, ox = t.x || 0, oy = t.y || 0;
   let moved = false;
@@ -89,12 +111,17 @@ export function render(el) {
   onRedraw = () => { cleanup(); redraw(); };
   document.addEventListener('tables-redraw', onRedraw);
 
-  const canvas = h('div', { class: 'canvas' }, tables.map(t => {
+  const canvas = h('div', { class: `canvas ${moveMode ? 'moving' : ''}` }, tables.map(t => {
     const [w, hh] = SIZE[t.shape] || SIZE.round, n = seated(t.id).length, over = n > t.capacity;
     const node = h('div', { class: `tbl ${t.shape} ${t.id === selTable ? 'sel' : ''} ${over ? 'over' : ''}`, 'data-table': t.id,
       style: `left:${t.x || 0}px;top:${t.y || 0}px;width:${w}px;height:${hh}px;transform:rotate(${t.rotation || 0}deg)` },
       h('b', {}, t.name), h('span', {}, `${n}/${t.capacity}`));
     node.addEventListener('pointerdown', e => dragTable(e, t, node));
+    node.addEventListener('click', async () => {
+      if (node._h) { node._h = false; return; }
+      selTable = t.id;
+      if (selGuest) await assign([selGuest], t.id); else redraw();
+    });
     return node;
   }));
 
@@ -109,6 +136,7 @@ export function render(el) {
           selTable = '';
         } }, '🗑'))),
     h('p', { class: 'muted small' }, `Locuri libere: ${Math.max(sel.capacity - seated(sel.id).length, 0)}`),
+    h('button', { class: 'btn primary', onclick: () => pickGuests(sel) }, '+ Alocă invitați'),
     seated(sel.id).sort(byName).map(g => h('div', { class: 'grow' }, h('span', { class: 'ginfo' }, g.name),
       h('button', { class: 'btn small', onclick: () => update('guests', g.id, { tableId: '' }) }, 'Scoate')))) : null;
 
@@ -133,6 +161,7 @@ export function render(el) {
     h('div', { class: 'row no-print' },
       h('button', { class: 'btn primary', onclick: () => editTable() }, '+ Masă'),
       h('button', { class: 'btn', onclick: () => window.print() }, 'Printează / PDF'),
+      h('button', { class: `btn ${moveMode ? 'primary' : ''}`, onclick: () => { moveMode = !moveMode; redraw(); } }, moveMode ? 'Mutare: ACTIVĂ' : 'Mută mesele'),
       h('span', { class: 'muted small' }, `${tables.reduce((s, t) => s + t.capacity, 0)} locuri, ${active.length - free.length} alocați`)),
     h('div', { class: 'canvas-wrap' }, canvas),
     h('div', { class: 'no-print' }, detail || '', pool), printList);

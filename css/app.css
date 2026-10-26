@@ -45,7 +45,7 @@ select.rsvp { width:auto; margin:0; padding:.3rem; font-size:.85rem; }
 select.rsvp.confirmat { background:#e3f4e9; } select.rsvp.refuzat { background:#fbe4e2; }
 .canvas-wrap { overflow:auto; border:1px solid var(--line); border-radius:12px; background:#fff; margin:.8rem 0; max-height:60dvh; }
 .canvas { position:relative; width:1200px; height:800px; background-image:radial-gradient(var(--line) 1px, transparent 1px); background-size:24px 24px; }
-.tbl { position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f6e9ec; border:2px solid var(--accent); touch-action:none; cursor:grab; user-select:none; text-align:center; font-size:.85rem; }
+.tbl { position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f6e9ec; border:2px solid var(--accent); cursor:grab; user-select:none; text-align:center; font-size:.85rem; }
 .tbl.round { border-radius:50%; } .tbl.rect { border-radius:8px; } .tbl.honor { border-radius:8px; background:#f1dfa8; }
 .tbl.sel { box-shadow:0 0 0 3px var(--accent); } .tbl.over { border-color:var(--err); background:#fbe4e2; }
 .chips { display:flex; flex-wrap:wrap; gap:.35rem; margin:.4rem 0 .8rem; }
@@ -62,3 +62,15 @@ select.rsvp.confirmat { background:#e3f4e9; } select.rsvp.refuzat { background:#
 .task.done .ginfo { text-decoration:line-through; color:var(--muted); }
 .late { color:var(--err); }
 .big { font-size:2.2rem; color:var(--accent); font-weight:700; }
+
+.canvas.moving .tbl { touch-action:none; } .canvas.moving { touch-action:none; }
+.picklist { max-height:50dvh; overflow:auto; margin:.6rem 0; } .pick { padding:.5rem 0; border-bottom:1px solid var(--line); font-size:1rem; color:var(--ink); } .pick input { width:22px; height:22px; }
+@media (max-width:600px) {
+  main { padding:.7rem; }
+  .stats { grid-template-columns:repeat(2,1fr); } .stat b { font-size:1.05rem; }
+  .row.between { flex-direction:column; align-items:stretch; gap:.3rem; }
+  .row.between > span:last-child { display:flex; justify-content:space-between; align-items:center; gap:.4rem; flex-wrap:wrap; }
+  .btn { padding:.65rem .9rem; } .btn.small { padding:.45rem .7rem; }
+  .pay { flex-wrap:wrap; } .filters { grid-template-columns:1fr 1fr; } .filters input { grid-column:1/-1; }
+  .canvas-wrap { max-height:50dvh; }
+}
