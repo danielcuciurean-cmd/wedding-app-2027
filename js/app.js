@@ -12,7 +12,7 @@ const ROUTES = [
   { path: 'tasks', title: 'Sarcini', icon: '✅', load: () => import('./modules/tasks.js') }
 ];
 
-let current = null, unsubRender = null;
+let current = null, unsubRender = null, redraw = null, pending = false;
 
 function buildNav() {
   const nav = $('#nav');
@@ -29,15 +29,21 @@ async function route() {
   try {
     const mod = await r.load();
     current = mod;
-    const draw = () => mod.render(view);
+    const draw = () => { pending = false; mod.render(view); };
+    redraw = draw;
     draw();
-    // Re-desenează la schimbări de date, dar nu cât timp un formular/modal este deschis.
-    unsubRender = subscribe(() => { if (!document.querySelector('.modal-back') && !mod.noAutoRender) draw(); });
+    // Re-desenează la schimbări de date; cât timp un modal e deschis, amână până la închidere.
+    unsubRender = subscribe(() => {
+      if (mod.noAutoRender) return;
+      if (document.querySelector('.modal-back')) pending = true; else draw();
+    });
   } catch (e) {
     console.error(e);
     view.replaceChildren(h('p', { class: 'error' }, 'Modulul nu a putut fi încărcat.'));
   }
 }
+
+document.addEventListener('modal-closed', () => { if (pending && redraw && !document.querySelector('.modal-back')) redraw(); });
 
 function showLogin(show) {
   $('#login').classList.toggle('hidden', !show);
