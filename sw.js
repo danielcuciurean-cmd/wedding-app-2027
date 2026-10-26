@@ -1,7 +1,7 @@
-const CACHE = 'nunta-v7';
+const CACHE = 'nunta-v8';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'js/app.js', 'js/auth.js', 'js/db.js', 'js/ui.js', 'js/firebase-config.js',
-  'js/modules/dashboard.js', 'js/modules/guests.js', 'js/modules/tables.js', 'js/modules/budget.js', 'js/modules/tasks.js'];
+  'js/modules/dashboard.js', 'js/modules/guests.js', 'js/modules/tables.js', 'js/modules/budget.js', 'js/modules/tasks.js', 'js/modules/gifts.js'];
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(

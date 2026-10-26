@@ -8,6 +8,7 @@ const ROUTES = [
   { path: 'guests', title: 'Invitați', icon: '👥', load: () => import('./modules/guests.js') },
   { path: 'tables', title: 'Mese', icon: '🪑', load: () => import('./modules/tables.js') },
   { path: 'budget', title: 'Buget', icon: '💶', load: () => import('./modules/budget.js') },
+  { path: 'gifts', title: 'Cadouri', icon: '🎁', load: () => import('./modules/gifts.js') },
   { path: 'tasks', title: 'Sarcini', icon: '✅', load: () => import('./modules/tasks.js') }
 ];
 
