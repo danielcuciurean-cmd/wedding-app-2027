@@ -1,5 +1,6 @@
 import { data, add, update, remove, batch } from '../db.js';
 import { h, formModal, confirmDialog, modal, toast } from '../ui.js';
+import { editGuest } from './guests.js';
 
 const SHAPES = [['round', 'Rotundă'], ['rect', 'Dreptunghiulară'], ['honor', 'Masă de onoare']];
 const SIZE = { round: [110, 110], rect: [160, 80], honor: [260, 70] };
@@ -213,6 +214,7 @@ export function render(el) {
   el.replaceChildren(
     h('div', { class: 'row no-print' },
       h('button', { class: 'btn primary', onclick: () => editTable() }, '+ Masă'),
+      h('button', { class: 'btn primary', onclick: () => editGuest() }, '+ Invitat'),
       h('button', { class: 'btn', onclick: () => window.print() }, 'Printează / PDF'),
       h('button', { class: 'btn', onclick: arrange }, 'Aranjează în grilă'),
       h('button', { class: `btn ${moveMode ? 'primary' : ''}`, onclick: () => { moveMode = !moveMode; redraw(); } }, moveMode ? 'Mutare: ACTIVĂ' : 'Mută mesele'),

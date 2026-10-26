@@ -36,7 +36,7 @@ async function resolveGroup(v) {
   return v;
 }
 
-function editGuest(g) {
+export function editGuest(g) {
   formModal(g ? 'Editează invitat' : 'Invitat nou', guestFields(), g || { groupId: F.group }, async v => {
     v = await resolveGroup(v);
     if (g) await update('guests', g.id, v); else await add('guests', { ...v, tableId: '', seat: null });
