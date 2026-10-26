@@ -4,7 +4,7 @@ import { h, formModal, confirmDialog, modal, toast } from '../ui.js';
 const SHAPES = [['round', 'Rotundă'], ['rect', 'Dreptunghiulară'], ['honor', 'Masă de onoare']];
 const SIZE = { round: [110, 110], rect: [160, 80], honor: [260, 70] };
 export let noAutoRender = false;
-let selTable = '', selGuest = '', onRedraw = null, moveMode = false, poolQ = '';
+let selTable = '', selGuest = '', onRedraw = null, onKey = null, redrawFn = null, moveMode = false, poolQ = '';
 
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ro', { numeric: true });
 const seated = id => data('guests').filter(g => g.tableId === id && g.rsvp !== 'refuzat');
@@ -136,7 +136,9 @@ function dragGuest(e, g, chip) {
   addEventListener('pointermove', mv); addEventListener('pointerup', up);
 }
 
-export function cleanup() { if (onRedraw) document.removeEventListener('tables-redraw', onRedraw); onRedraw = null; }
+export function cleanup() {
+  if (onKey) document.removeEventListener('keydown', onKey); onKey = null;
+  if (onRedraw) document.removeEventListener('tables-redraw', onRedraw); onRedraw = null; }
 
 export function render(el) {
   const tables = data('tables').sort(byName), guests = data('guests'), groups = data('groups');
@@ -145,6 +147,9 @@ export function render(el) {
   const redraw = () => render(el);
   el.classList.add('wide');
   cleanup();
+  // Esc închide fereastra mesei (sau deselectează invitatul), dacă nu e un modal deschis.
+  onKey = e => { if (e.key === 'Escape' && !document.querySelector('.modal-back') && (selTable || selGuest)) { selTable = ''; selGuest = ''; redraw(); } };
+  document.addEventListener('keydown', onKey);
   onRedraw = () => { cleanup(); redraw(); };
   document.addEventListener('tables-redraw', onRedraw);
 
