@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Înlocuiește cu UID-urile celor doi utilizatori (Firebase Console > Authentication).
+    function allowed() {
+      return request.auth != null &&
+        request.auth.uid in ['UID_DANIEL', 'UID_MIREASA'];
+    }
+    match /{document=**} {
+      allow read, write: if allowed();
+    }
+  }
+}
