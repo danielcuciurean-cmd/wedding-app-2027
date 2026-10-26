@@ -9,6 +9,13 @@ let selTable = '', selGuest = '', onRedraw = null, moveMode = false, poolQ = '';
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ro', { numeric: true });
 const seated = id => data('guests').filter(g => g.tableId === id && g.rsvp !== 'refuzat');
 const w = g => 1 + (Number(g.kidsCount) || 0); // un invitat cu copii ocupă mai multe locuri
+const confirmedCount = id => seated(id).filter(g => g.rsvp === 'confirmat').length;
+const toggleRsvp = g => update('guests', g.id, { rsvp: g.rsvp === 'confirmat' ? 'necunoscut' : 'confirmat' });
+const confirmBox = g => {
+  const b = h('input', { type: 'checkbox', class: 'rsvp-box', title: 'Confirmat', checked: g.rsvp === 'confirmat', onchange: () => toggleRsvp(g) });
+  ['click', 'pointerdown'].forEach(ev => b.addEventListener(ev, e => e.stopPropagation()));
+  return b;
+};
 const used = id => seated(id).reduce((n, g) => n + w(g), 0);
 
 const CELL_W = 200, CELL_H = 150, COLS = 5;
@@ -141,10 +148,10 @@ export function render(el) {
   document.addEventListener('tables-redraw', onRedraw);
 
   const canvas = h('div', { class: `canvas ${moveMode ? 'moving' : ''}` }, tables.map(t => {
-    const [w, hh] = SIZE[t.shape] || SIZE.round, n = used(t.id), over = n > t.capacity, rot = t.shape === 'round' ? 0 : (t.rotation || 0);
-    const node = h('div', { class: `tbl ${t.shape} ${t.id === selTable ? 'sel' : ''} ${over ? 'over' : ''}`, 'data-table': t.id,
+    const [w, hh] = SIZE[t.shape] || SIZE.round, n = used(t.id), over = n > t.capacity, ok = confirmedCount(t.id), allOk = n > 0 && ok === seated(t.id).length, rot = t.shape === 'round' ? 0 : (t.rotation || 0);
+    const node = h('div', { class: `tbl ${t.shape} ${t.id === selTable ? 'sel' : ''} ${over ? 'over' : ''} ${allOk && !over ? 'allok' : ''}`, 'data-table': t.id,
       style: `left:${t.x || 0}px;top:${t.y || 0}px;width:${w}px;height:${hh}px;transform:rotate(${rot}deg)` },
-      h('div', { class: 'tlabel', style: `transform:rotate(${-rot}deg)` }, h('b', {}, t.name), h('span', {}, `${n}/${t.capacity}`)));
+      h('div', { class: 'tlabel', style: `transform:rotate(${-rot}deg)` }, h('b', {}, t.name), h('span', {}, `${n}/${t.capacity}`), seated(t.id).length ? h('span', { class: 'okline' }, `✓ ${ok}/${seated(t.id).length}`) : ''));
     node.addEventListener('pointerdown', e => dragTable(e, t, node));
     node.addEventListener('click', async () => {
       if (node._h) { node._h = false; return; }
@@ -168,13 +175,13 @@ export function render(el) {
     h('button', { class: 'btn primary', onclick: () => pickGuests(sel) }, '+ Alocă invitați'),
     h('div', { class: 'row', style: 'margin:.6rem 0' }, h('span', { class: 'muted small' }, 'Mută masa:'),
       [['◀', -30, 0], ['▲', 0, -30], ['▼', 0, 30], ['▶', 30, 0]].map(([l, dx, dy]) => h('button', { class: 'btn small', onclick: () => nudge(sel, dx, dy) }, l))),
-    seated(sel.id).sort(byName).map(g => h('div', { class: 'grow' }, h('span', { class: 'ginfo' }, g.name),
+    seated(sel.id).sort(byName).map(g => h('div', { class: `grow ${g.rsvp === 'confirmat' ? 'okrow' : ''}` }, confirmBox(g), h('span', { class: 'ginfo' }, g.name, g.kidsCount > 0 ? h('span', { class: 'tag' }, `+${g.kidsCount}`) : ''),
       h('button', { class: 'btn small', onclick: () => update('guests', g.id, { tableId: '' }) }, 'Scoate')))) : null;
 
   const gname = Object.fromEntries(groups.map(g => [g.id, g.name]));
   const item = g => {
-    const c = h('div', { class: `pitem ${g.id === selGuest ? 'sel' : ''}`, onclick: () => { selGuest = selGuest === g.id ? '' : g.id; redraw(); } },
-      h('span', {}, g.name, g.kidsCount > 0 ? h('span', { class: 'tag' }, `+${g.kidsCount}`) : ''), h('span', { class: 'muted small' }, gname[g.groupId] || ''));
+    const c = h('div', { class: `pitem ${g.id === selGuest ? 'sel' : ''} ${g.rsvp === 'confirmat' ? 'okrow' : ''}`, onclick: () => { selGuest = selGuest === g.id ? '' : g.id; redraw(); } },
+      h('span', { class: 'prow' }, confirmBox(g), g.name, g.kidsCount > 0 ? h('span', { class: 'tag' }, `+${g.kidsCount}`) : ''), h('span', { class: 'muted small' }, gname[g.groupId] || ''));
     c.addEventListener('pointerdown', e => dragGuest(e, g, c));
     return c;
   };
@@ -188,7 +195,7 @@ export function render(el) {
   const side = h('div', { class: 'card tbl-side no-print' },
     h('div', { class: 'row between' }, h('h3', {}, `Nealocați (${free.length})`),
       h('button', { class: 'btn small', onclick: pickGroup }, 'Alocă un grup')),
-    h('p', { class: 'muted small' }, selGuest ? 'Atinge acum o masă ca să-l aloci.' : 'Trage un nume pe masă (mouse) sau atinge-l, apoi atinge masa.'),
+    h('p', { class: 'muted small' }, selGuest ? 'Atinge acum o masă ca să-l aloci.' : 'Trage un nume pe masă (mouse) sau atinge-l, apoi atinge masa. Bifa = confirmat.'),
     search, listBox);
   drawPool();
 

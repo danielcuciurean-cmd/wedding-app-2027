@@ -95,3 +95,10 @@ select.rsvp.confirmat { background:#e3f4e9; } select.rsvp.refuzat { background:#
   .tbl-side { position:sticky; top:70px; margin:0; }
   .plist { max-height:calc(100dvh - 400px); }
 }
+
+.tbl.allok { background:#dff3e5; border-color:var(--ok); }
+.okline { font-size:.75rem; color:var(--ok); font-weight:600; }
+.okrow { background:#e8f6ec; }
+.pitem.okrow { border-color:#a9d9b8; } .pitem.sel.okrow { background:var(--ok); }
+.prow { display:flex; align-items:center; gap:.5rem; } .rsvp-box { width:20px; height:20px; margin:0; accent-color:var(--ok); }
+.grow.okrow { padding-left:.4rem; border-radius:6px; }
