@@ -43,7 +43,7 @@ export const newId = col => doc(collection(db, col)).id;
 
 // Magazin reactiv simplu: păstrează ultima stare a fiecărei colecții.
 const store = {}, subs = new Set(), unsubs = [];
-export const COLLECTIONS = ['groups', 'guests', 'tables', 'categories', 'expenses', 'payments', 'tasks', 'schedule'];
+export const COLLECTIONS = ['groups', 'guests', 'tables', 'categories', 'expenses', 'payments', 'tasks', 'schedule', 'gifts'];
 export const data = c => store[c] || [];
 export let settings = {};
 export const subscribe = fn => (subs.add(fn), () => subs.delete(fn));

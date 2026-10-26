@@ -22,12 +22,14 @@ export function toast(msg, type = 'info') {
 }
 
 export function modal(title, content, { onClose } = {}) {
-  const close = () => { back.remove(); onClose?.(); };
+  const onEsc = e => { if (e.key === 'Escape') close(); };
+  const close = () => { document.removeEventListener('keydown', onEsc); back.remove(); onClose?.(); document.dispatchEvent(new Event('modal-closed')); };
   const back = h('div', { class: 'modal-back', onclick: e => e.target === back && close() },
     h('div', { class: 'modal card', role: 'dialog' },
       h('div', { class: 'modal-head' }, h('h2', {}, title), h('button', { class: 'btn small', onclick: close }, '✕')),
       content));
   document.body.append(back);
+  document.addEventListener('keydown', onEsc);
   return { close, el: back };
 }
 

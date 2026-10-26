@@ -4,6 +4,7 @@ import { h, formModal, confirmDialog, modal, toast } from '../ui.js';
 export const SIDES = [['comun', 'Comun'], ['mire', 'Mire'], ['mireasa', 'Mireasă']];
 export const RSVP = [['necunoscut', 'Necunoscut'], ['confirmat', 'Confirmat'], ['refuzat', 'Refuzat']];
 export const MEALS = [['standard', 'Standard'], ['vegetarian', 'Vegetarian'], ['copil', 'Copil'], ['alt', 'Alt']];
+const kidsText = g => (Number(g.kidsCount) > 0 ? `+${g.kidsCount} ${g.kidsCount == 1 ? 'copil' : 'copii'}${g.kidsAges ? ` (${g.kidsAges} ani)` : ''}` : '');
 const lab = (list, v) => (list.find(x => x[0] === v) || [, v || ''])[1];
 
 // Starea filtrelor rămâne între re-desenări.
@@ -14,7 +15,9 @@ const guestFields = () => [
   { name: 'groupId', label: 'Grup', type: 'select', options: [['', '— fără grup —'], ...data('groups').sort(byName).map(g => [g.id, g.name])] },
   { name: 'newGroup', label: 'sau grup nou (nume)' },
   { name: 'side', label: 'Parte', type: 'select', options: SIDES, default: 'comun' },
-  { name: 'isChild', label: 'Copil', type: 'checkbox' },
+  { name: 'isChild', label: 'Este copil', type: 'checkbox' },
+  { name: 'kidsCount', label: 'Vine cu copii: câți?', type: 'number', default: 0 },
+  { name: 'kidsAges', label: 'Vârstele copiilor (ex. 3, 7)' },
   { name: 'rsvp', label: 'RSVP', type: 'select', options: RSVP, default: 'necunoscut' },
   { name: 'meal', label: 'Meniu', type: 'select', options: MEALS, default: 'standard' },
   { name: 'dietary', label: 'Restricții alimentare' },
@@ -33,7 +36,7 @@ async function resolveGroup(v) {
   return v;
 }
 
-function editGuest(g) {
+export function editGuest(g) {
   formModal(g ? 'Editează invitat' : 'Invitat nou', guestFields(), g || { groupId: F.group }, async v => {
     v = await resolveGroup(v);
     if (g) await update('guests', g.id, v); else await add('guests', { ...v, tableId: '', seat: null });
@@ -65,7 +68,7 @@ export function stats(guests = data('guests')) {
   guests.filter(g => g.rsvp !== 'refuzat').forEach(g => { meals[g.meal || 'standard'] = (meals[g.meal || 'standard'] || 0) + 1; });
   return {
     total: guests.length, confirmat: c('confirmat'), refuzat: c('refuzat'), asteptare: c('necunoscut'),
-    copii: guests.filter(g => g.isChild && g.rsvp !== 'refuzat').length,
+    copii: guests.filter(g => g.rsvp !== 'refuzat').reduce((n, g) => n + (g.isChild ? 1 : 0) + (Number(g.kidsCount) || 0), 0),
     cazare: guests.filter(g => g.lodging && g.rsvp !== 'refuzat').length, meals
   };
 }
@@ -83,7 +86,7 @@ function guestRow(g) {
   return h('div', { class: 'grow' },
     h('div', { class: 'ginfo', onclick: () => editGuest(g) },
       h('strong', {}, g.name), g.isChild ? h('span', { class: 'tag' }, 'copil') : null,
-      h('div', { class: 'muted small' }, [lab(SIDES, g.side), lab(MEALS, g.meal), g.dietary, g.lodging ? 'cazare' : ''].filter(Boolean).join(' · '))),
+      h('div', { class: 'muted small' }, [lab(SIDES, g.side), lab(MEALS, g.meal), g.dietary, g.lodging ? 'cazare' : '', kidsText(g)].filter(Boolean).join(' · '))),
     h('select', { class: `rsvp ${g.rsvp}`, onchange: e => update('guests', g.id, { rsvp: e.target.value }) },
       RSVP.map(([v, l]) => h('option', { value: v, selected: g.rsvp === v }, l))),
     h('button', { class: 'btn small', title: 'Șterge', onclick: () => delGuest(g) }, '🗑'));
@@ -108,12 +111,12 @@ function drawList(box, cnt) {
 }
 
 // ---- CSV ----
-const COLS = ['nume', 'grup', 'parte', 'copil', 'rsvp', 'meniu', 'restrictii', 'cazare', 'observatii'];
+const COLS = ['nume', 'grup', 'parte', 'copil', 'rsvp', 'meniu', 'restrictii', 'cazare', 'observatii', 'copii_nr', 'copii_varste'];
 const q = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
 
 function exportCsv() {
   const gn = Object.fromEntries(data('groups').map(g => [g.id, g.name]));
-  const rows = data('guests').sort(byName).map(g => [g.name, gn[g.groupId] || '', g.side, g.isChild ? 'da' : 'nu', g.rsvp, g.meal, g.dietary, g.lodging ? 'da' : 'nu', g.notes]);
+  const rows = data('guests').sort(byName).map(g => [g.name, gn[g.groupId] || '', g.side, g.isChild ? 'da' : 'nu', g.rsvp, g.meal, g.dietary, g.lodging ? 'da' : 'nu', g.notes, g.kidsCount || 0, g.kidsAges]);
   const csv = '﻿' + [COLS, ...rows].map(r => r.map(q).join(',')).join('\r\n');
   const a = h('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })), download: 'invitati.csv' });
   document.body.append(a); a.click(); a.remove();
@@ -158,7 +161,7 @@ async function importCsv(file) {
     ops.push({ type: 'set', col: 'guests', id: newId('guests'), data: {
       name, groupId, side, isChild: yes(get('copil')), rsvp: oneOf(get('rsvp'), RSVP, 'necunoscut'),
       meal: oneOf(get('meniu'), MEALS, 'standard'), dietary: get('restrictii'), lodging: yes(get('cazare')),
-      notes: get('observatii'), tableId: '', seat: null } });
+      notes: get('observatii'), kidsCount: Number(get('copii_nr')) || 0, kidsAges: get('copii_varste'), tableId: '', seat: null } });
     n++;
   }
   await batch(ops);

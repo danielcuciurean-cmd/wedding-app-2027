@@ -8,10 +8,11 @@ const ROUTES = [
   { path: 'guests', title: 'Invitați', icon: '👥', load: () => import('./modules/guests.js') },
   { path: 'tables', title: 'Mese', icon: '🪑', load: () => import('./modules/tables.js') },
   { path: 'budget', title: 'Buget', icon: '💶', load: () => import('./modules/budget.js') },
+  { path: 'gifts', title: 'Cadouri', icon: '🎁', load: () => import('./modules/gifts.js') },
   { path: 'tasks', title: 'Sarcini', icon: '✅', load: () => import('./modules/tasks.js') }
 ];
 
-let current = null, unsubRender = null;
+let current = null, unsubRender = null, redraw = null, pending = false;
 
 function buildNav() {
   const nav = $('#nav');
@@ -24,19 +25,26 @@ async function route() {
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.path === r.path));
   current?.cleanup?.(); unsubRender?.();
   const view = $('#view');
+  view.className = '';
   view.replaceChildren(h('p', { class: 'muted' }, 'Se încarcă…'));
   try {
     const mod = await r.load();
     current = mod;
-    const draw = () => mod.render(view);
+    const draw = () => { pending = false; mod.render(view); };
+    redraw = draw;
     draw();
-    // Re-desenează la schimbări de date, dar nu cât timp un formular/modal este deschis.
-    unsubRender = subscribe(() => { if (!document.querySelector('.modal-back') && !mod.noAutoRender) draw(); });
+    // Re-desenează la schimbări de date; cât timp un modal e deschis, amână până la închidere.
+    unsubRender = subscribe(() => {
+      if (mod.noAutoRender) return;
+      if (document.querySelector('.modal-back')) pending = true; else draw();
+    });
   } catch (e) {
     console.error(e);
     view.replaceChildren(h('p', { class: 'error' }, 'Modulul nu a putut fi încărcat.'));
   }
 }
+
+document.addEventListener('modal-closed', () => { if (pending && redraw && !document.querySelector('.modal-back')) redraw(); });
 
 function showLogin(show) {
   $('#login').classList.toggle('hidden', !show);
@@ -64,5 +72,11 @@ onAuth(user => {
 });
 
 if ('serviceWorker' in navigator) {
+  // Actualizare automată: când se activează un service worker nou, reîncarcă o singură dată.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+  });
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e)));
 }
