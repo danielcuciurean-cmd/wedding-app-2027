@@ -9,15 +9,31 @@ let selTable = '', selGuest = '', onRedraw = null, moveMode = false;
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ro', { numeric: true });
 const seated = id => data('guests').filter(g => g.tableId === id && g.rsvp !== 'refuzat');
 
+const CELL_W = 200, CELL_H = 150, COLS = 5;
+const gridPos = i => ({ x: 20 + (i % COLS) * CELL_W, y: 20 + Math.floor(i / COLS) * CELL_H });
+function freeSpot() {
+  const ts = data('tables');
+  for (let i = 0; i < 200; i++) {
+    const p = gridPos(i);
+    if (!ts.some(t => Math.abs((t.x || 0) - p.x) < 120 && Math.abs((t.y || 0) - p.y) < 100)) return p;
+  }
+  return gridPos(ts.length);
+}
+async function arrange() {
+  if (!await confirmDialog('Aranjez toate mesele în grilă? Pozițiile actuale se pierd.')) return;
+  await batch(data('tables').sort(byName).map((t, i) => ({ type: 'update', col: 'tables', id: t.id, data: gridPos(i) })));
+}
+const nudge = (t, dx, dy) => update('tables', t.id, { x: Math.max(0, (t.x || 0) + dx), y: Math.max(0, (t.y || 0) + dy) });
+
 function editTable(t) {
   formModal(t ? 'Editează masa' : 'Masă nouă', [
     { name: 'name', label: 'Nume / număr', required: true },
     { name: 'shape', label: 'Formă', type: 'select', options: SHAPES, default: 'round' },
     { name: 'capacity', label: 'Capacitate (locuri)', type: 'number', default: 10, required: true },
-    { name: 'rotation', label: 'Rotație (grade)', type: 'number', default: 0 }
+    { name: 'rotation', label: 'Rotație (grade, doar pentru mese dreptunghiulare)', type: 'number', default: 0 }
   ], t || {}, async v => {
     if (t) await update('tables', t.id, v);
-    else { const n = data('tables').length; await add('tables', { ...v, x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 30 }); }
+    else await add('tables', { ...v, ...freeSpot() });
   });
 }
 
@@ -112,10 +128,10 @@ export function render(el) {
   document.addEventListener('tables-redraw', onRedraw);
 
   const canvas = h('div', { class: `canvas ${moveMode ? 'moving' : ''}` }, tables.map(t => {
-    const [w, hh] = SIZE[t.shape] || SIZE.round, n = seated(t.id).length, over = n > t.capacity;
+    const [w, hh] = SIZE[t.shape] || SIZE.round, n = seated(t.id).length, over = n > t.capacity, rot = t.shape === 'round' ? 0 : (t.rotation || 0);
     const node = h('div', { class: `tbl ${t.shape} ${t.id === selTable ? 'sel' : ''} ${over ? 'over' : ''}`, 'data-table': t.id,
-      style: `left:${t.x || 0}px;top:${t.y || 0}px;width:${w}px;height:${hh}px;transform:rotate(${t.rotation || 0}deg)` },
-      h('b', {}, t.name), h('span', {}, `${n}/${t.capacity}`));
+      style: `left:${t.x || 0}px;top:${t.y || 0}px;width:${w}px;height:${hh}px;transform:rotate(${rot}deg)` },
+      h('div', { class: 'tlabel', style: `transform:rotate(${-rot}deg)` }, h('b', {}, t.name), h('span', {}, `${n}/${t.capacity}`)));
     node.addEventListener('pointerdown', e => dragTable(e, t, node));
     node.addEventListener('click', async () => {
       if (node._h) { node._h = false; return; }
@@ -137,6 +153,8 @@ export function render(el) {
         } }, '🗑'))),
     h('p', { class: 'muted small' }, `Locuri libere: ${Math.max(sel.capacity - seated(sel.id).length, 0)}`),
     h('button', { class: 'btn primary', onclick: () => pickGuests(sel) }, '+ Alocă invitați'),
+    h('div', { class: 'row', style: 'margin:.6rem 0' }, h('span', { class: 'muted small' }, 'Mută masa:'),
+      [['◀', -30, 0], ['▲', 0, -30], ['▼', 0, 30], ['▶', 30, 0]].map(([l, dx, dy]) => h('button', { class: 'btn small', onclick: () => nudge(sel, dx, dy) }, l))),
     seated(sel.id).sort(byName).map(g => h('div', { class: 'grow' }, h('span', { class: 'ginfo' }, g.name),
       h('button', { class: 'btn small', onclick: () => update('guests', g.id, { tableId: '' }) }, 'Scoate')))) : null;
 
@@ -161,8 +179,10 @@ export function render(el) {
     h('div', { class: 'row no-print' },
       h('button', { class: 'btn primary', onclick: () => editTable() }, '+ Masă'),
       h('button', { class: 'btn', onclick: () => window.print() }, 'Printează / PDF'),
+      h('button', { class: 'btn', onclick: arrange }, 'Aranjează în grilă'),
       h('button', { class: `btn ${moveMode ? 'primary' : ''}`, onclick: () => { moveMode = !moveMode; redraw(); } }, moveMode ? 'Mutare: ACTIVĂ' : 'Mută mesele'),
       h('span', { class: 'muted small' }, `${tables.reduce((s, t) => s + t.capacity, 0)} locuri, ${active.length - free.length} alocați`)),
+    moveMode ? h('p', { class: 'muted small no-print' }, 'Mutare activă: trage mesele cu degetul. Dezactivează pentru a derula pagina.') : '',
     h('div', { class: 'canvas-wrap' }, canvas),
     h('div', { class: 'no-print' }, detail || '', pool), printList);
 }

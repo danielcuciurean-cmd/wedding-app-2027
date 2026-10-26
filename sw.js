@@ -1,4 +1,4 @@
-const CACHE = 'nunta-v10';
+const CACHE = 'nunta-v11';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'js/app.js', 'js/auth.js', 'js/db.js', 'js/ui.js', 'js/firebase-config.js',
   'js/modules/dashboard.js', 'js/modules/guests.js', 'js/modules/tables.js', 'js/modules/budget.js', 'js/modules/tasks.js', 'js/modules/gifts.js'];
