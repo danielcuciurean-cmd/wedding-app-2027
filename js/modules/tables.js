@@ -8,6 +8,8 @@ let selTable = '', selGuest = '', onRedraw = null, moveMode = false;
 
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ro', { numeric: true });
 const seated = id => data('guests').filter(g => g.tableId === id && g.rsvp !== 'refuzat');
+const w = g => 1 + (Number(g.kidsCount) || 0); // un invitat cu copii ocupă mai multe locuri
+const used = id => seated(id).reduce((n, g) => n + w(g), 0);
 
 const CELL_W = 200, CELL_H = 150, COLS = 5;
 const gridPos = i => ({ x: 20 + (i % COLS) * CELL_W, y: 20 + Math.floor(i / COLS) * CELL_H });
@@ -39,8 +41,9 @@ function editTable(t) {
 
 async function assign(guestIds, tableId) {
   const t = data('tables').find(x => x.id === tableId); if (!t) return;
-  const free = t.capacity - seated(tableId).length;
-  if (guestIds.length > free && !await confirmDialog(`Masa „${t.name}” are ${Math.max(free, 0)} locuri libere, iar tu aloci ${guestIds.length}. Depășești capacitatea. Continui?`)) return;
+  const need = guestIds.reduce((n, id) => n + w(data('guests').find(g => g.id === id) || {}), 0);
+  const free = t.capacity - used(tableId);
+  if (need > free && !await confirmDialog(`Masa „${t.name}” are ${Math.max(free, 0)} locuri libere, iar tu aloci ${need} locuri. Depășești capacitatea. Continui?`)) return;
   await batch(guestIds.map(id => ({ type: 'update', col: 'guests', id, data: { tableId } })));
   selGuest = '';
 }
@@ -49,7 +52,7 @@ function assignGroup(gr) {
   const ids = data('guests').filter(g => g.groupId === gr.id && !g.tableId && g.rsvp !== 'refuzat').map(g => g.id);
   if (!ids.length) return toast('Nimeni nealocat în grup');
   formModal(`Alocă „${gr.name}” (${ids.length})`, [
-    { name: 'tableId', label: 'Masa', type: 'select', options: data('tables').sort(byName).map(t => [t.id, `${t.name} (${seated(t.id).length}/${t.capacity})`]) }
+    { name: 'tableId', label: 'Masa', type: 'select', options: data('tables').sort(byName).map(t => [t.id, `${t.name} (${used(t.id)}/${t.capacity})`]) }
   ], {}, v => assign(ids, v.tableId));
 }
 
@@ -66,10 +69,10 @@ function pickGuests(t) {
     const term = q.value.toLowerCase();
     list.replaceChildren(...free.filter(g => !term || g.name.toLowerCase().includes(term) || (groups[g.groupId] || '').toLowerCase().includes(term)).map(g =>
       h('label', { class: 'check pick' }, h('input', { type: 'checkbox', checked: picked.has(g.id), onchange: e => { e.target.checked ? picked.add(g.id) : picked.delete(g.id); upd(); } }),
-        h('span', {}, g.name, h('span', { class: 'muted small' }, groups[g.groupId] ? ` · ${groups[g.groupId]}` : '')))));
+        h('span', {}, g.name, h('span', { class: 'muted small' }, (groups[g.groupId] ? ` · ${groups[g.groupId]}` : '') + (g.kidsCount > 0 ? ` · +${g.kidsCount} copii` : ''))))));
   };
   q.addEventListener('input', draw); draw(); upd();
-  const m = modal(`Alocă la ${t.name} (${Math.max(t.capacity - seated(t.id).length, 0)} libere)`, h('div', {}, q, list, h('div', { class: 'row end' }, btn)));
+  const m = modal(`Alocă la ${t.name} (${Math.max(t.capacity - used(t.id), 0)} libere)`, h('div', {}, q, list, h('div', { class: 'row end' }, btn)));
   btn.addEventListener('click', async () => { if (!picked.size) return; m.close(); await assign([...picked], t.id); });
 }
 
@@ -128,7 +131,7 @@ export function render(el) {
   document.addEventListener('tables-redraw', onRedraw);
 
   const canvas = h('div', { class: `canvas ${moveMode ? 'moving' : ''}` }, tables.map(t => {
-    const [w, hh] = SIZE[t.shape] || SIZE.round, n = seated(t.id).length, over = n > t.capacity, rot = t.shape === 'round' ? 0 : (t.rotation || 0);
+    const [w, hh] = SIZE[t.shape] || SIZE.round, n = used(t.id), over = n > t.capacity, rot = t.shape === 'round' ? 0 : (t.rotation || 0);
     const node = h('div', { class: `tbl ${t.shape} ${t.id === selTable ? 'sel' : ''} ${over ? 'over' : ''}`, 'data-table': t.id,
       style: `left:${t.x || 0}px;top:${t.y || 0}px;width:${w}px;height:${hh}px;transform:rotate(${rot}deg)` },
       h('div', { class: 'tlabel', style: `transform:rotate(${-rot}deg)` }, h('b', {}, t.name), h('span', {}, `${n}/${t.capacity}`)));
@@ -143,7 +146,7 @@ export function render(el) {
 
   const sel = tables.find(t => t.id === selTable);
   const detail = sel ? h('div', { class: 'card' },
-    h('div', { class: 'row between' }, h('h3', {}, `${sel.name} · ${seated(sel.id).length}/${sel.capacity}`),
+    h('div', { class: 'row between' }, h('h3', {}, `${sel.name} · ${used(sel.id)}/${sel.capacity}`),
       h('span', {}, h('button', { class: 'btn small', onclick: () => editTable(sel) }, '✎'), ' ',
         h('button', { class: 'btn small', onclick: async () => {
           if (!await confirmDialog(`Ștergi masa „${sel.name}”? Invitații vor deveni nealocați.`)) return;
@@ -151,7 +154,7 @@ export function render(el) {
             { type: 'delete', col: 'tables', id: sel.id }]);
           selTable = '';
         } }, '🗑'))),
-    h('p', { class: 'muted small' }, `Locuri libere: ${Math.max(sel.capacity - seated(sel.id).length, 0)}`),
+    h('p', { class: 'muted small' }, `Locuri libere: ${Math.max(sel.capacity - used(sel.id), 0)}`),
     h('button', { class: 'btn primary', onclick: () => pickGuests(sel) }, '+ Alocă invitați'),
     h('div', { class: 'row', style: 'margin:.6rem 0' }, h('span', { class: 'muted small' }, 'Mută masa:'),
       [['◀', -30, 0], ['▲', 0, -30], ['▼', 0, 30], ['▶', 30, 0]].map(([l, dx, dy]) => h('button', { class: 'btn small', onclick: () => nudge(sel, dx, dy) }, l))),
@@ -173,7 +176,7 @@ export function render(el) {
     }));
 
   const printList = h('div', { class: 'print-only' }, h('h2', {}, 'Plan mese'),
-    tables.map(t => h('div', { class: 'ptable' }, h('b', {}, `${t.name} (${seated(t.id).length}/${t.capacity})`), ': ', seated(t.id).sort(byName).map(g => g.name).join(', ') || '—')));
+    tables.map(t => h('div', { class: 'ptable' }, h('b', {}, `${t.name} (${used(t.id)}/${t.capacity})`), ': ', seated(t.id).sort(byName).map(g => g.name).join(', ') || '—')));
 
   el.replaceChildren(
     h('div', { class: 'row no-print' },
