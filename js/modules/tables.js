@@ -5,7 +5,7 @@ import { editGuest } from './guests.js';
 const SHAPES = [['round', 'Rotundă'], ['rect', 'Dreptunghiulară'], ['honor', 'Masă de onoare']];
 const SIZE = { round: [110, 110], rect: [160, 80], honor: [260, 70] };
 export let noAutoRender = false;
-let selTable = '', selGuest = '', onRedraw = null, onKey = null, redrawFn = null, moveMode = false, poolQ = '';
+let selTable = '', selGuest = '', onRedraw = null, onKey = null, onResize = null, moveMode = false, poolQ = '';
 
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ro', { numeric: true });
 const seated = id => data('guests').filter(g => g.tableId === id && g.rsvp !== 'refuzat');
@@ -19,7 +19,15 @@ const confirmBox = g => {
 };
 const used = id => seated(id).reduce((n, g) => n + w(g), 0);
 
-const CELL_W = 200, CELL_H = 150, COLS = 5;
+const CW = 1700, CH = 900; // dimensiunile logice ale hărții (încap 40 de mese)
+const CELL_W = 200, CELL_H = 150, COLS = 8;
+// Pe laptop harta se scalează să încapă în ecran, fără scroll; pe telefon rămâne la mărime reală, cu derulare.
+let S = 1;
+const calcScale = () => {
+  if (innerWidth < 900) return 1;
+  const w = (innerWidth - 45) * 0.8 - 4, hh = innerHeight - 209;
+  return Math.max(0.3, Math.min(1, w / CW, hh / CH));
+};
 const gridPos = i => ({ x: 20 + (i % COLS) * CELL_W, y: 20 + Math.floor(i / COLS) * CELL_H });
 function freeSpot() {
   const ts = data('tables');
@@ -106,14 +114,14 @@ function dragTable(e, t, el) {
   noAutoRender = true;
   el.setPointerCapture(e.pointerId);
   const mv = ev => {
-    const dx = ev.clientX - sx, dy = ev.clientY - sy;
-    if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    const dx = (ev.clientX - sx) / S, dy = (ev.clientY - sy) / S;
+    if (Math.abs(dx) + Math.abs(dy) > 4 / S) moved = true;
     el.style.left = Math.max(0, ox + dx) + 'px'; el.style.top = Math.max(0, oy + dy) + 'px';
   };
   const up = async ev => {
     el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
     noAutoRender = false;
-    if (moved) await update('tables', t.id, { x: Math.max(0, Math.round(ox + ev.clientX - sx)), y: Math.max(0, Math.round(oy + ev.clientY - sy)) });
+    if (moved) await update('tables', t.id, { x: Math.max(0, Math.min(CW - 40, Math.round(ox + (ev.clientX - sx) / S))), y: Math.max(0, Math.min(CH - 40, Math.round(oy + (ev.clientY - sy) / S))) });
     else if (selGuest) await assign([selGuest], t.id);
     else document.dispatchEvent(new Event('tables-redraw'));
   };
@@ -148,6 +156,7 @@ function dragGuest(e, g, chip) {
 
 export function cleanup() {
   if (onKey) document.removeEventListener('keydown', onKey); onKey = null;
+  if (onResize) removeEventListener('resize', onResize); onResize = null;
   if (onRedraw) document.removeEventListener('tables-redraw', onRedraw); onRedraw = null; }
 
 export function render(el) {
@@ -160,10 +169,12 @@ export function render(el) {
   // Esc închide fereastra mesei (sau deselectează invitatul), dacă nu e un modal deschis.
   onKey = e => { if (e.key === 'Escape' && !document.querySelector('.modal-back') && (selTable || selGuest)) { selTable = ''; selGuest = ''; redraw(); } };
   document.addEventListener('keydown', onKey);
+  if (!onResize) { let tm; onResize = () => { clearTimeout(tm); tm = setTimeout(() => { if (calcScale() !== S && !document.querySelector('.modal-back')) redraw(); }, 150); }; addEventListener('resize', onResize); }
   onRedraw = () => { cleanup(); redraw(); };
   document.addEventListener('tables-redraw', onRedraw);
 
-  const canvas = h('div', { class: `canvas ${moveMode ? 'moving' : ''}` }, tables.map(t => {
+  S = calcScale();
+  const canvas = h('div', { class: `canvas ${moveMode ? 'moving' : ''}`, style: `width:${CW}px;height:${CH}px;transform:scale(${S});transform-origin:0 0` }, tables.map(t => {
     const [w, hh] = SIZE[t.shape] || SIZE.round, n = used(t.id), over = n > t.capacity, ok = confirmedCount(t.id), allOk = n > 0 && ok === seated(t.id).length, rot = t.shape === 'round' ? 0 : (t.rotation || 0);
     const node = h('div', { class: `tbl ${t.shape} ${t.id === selTable ? 'sel' : ''} ${over ? 'over' : ''} ${allOk && !over ? 'allok' : ''}`, 'data-table': t.id,
       style: `left:${t.x || 0}px;top:${t.y || 0}px;width:${w}px;height:${hh}px;transform:rotate(${rot}deg)` },
@@ -179,7 +190,8 @@ export function render(el) {
 
   const sel = tables.find(t => t.id === selTable);
   const selSize = sel ? (SIZE[sel.shape] || SIZE.round) : [0, 0];
-  const detail = sel ? h('div', { class: 'card pop no-print', style: `left:${(sel.x || 0) + selSize[0] + 14}px;top:${sel.y || 0}px`, onpointerdown: e => e.stopPropagation() },
+  const popTop = (sel?.y || 0) * S + 380 > CH * S ? Math.max(0, (sel.y || 0) - 360 / S) : (sel?.y || 0);
+  const detail = sel ? h('div', { class: 'card pop no-print', style: `left:${(sel.x || 0) + selSize[0] + 14}px;top:${popTop}px;--ps:${1 / S}`, onpointerdown: e => e.stopPropagation() },
     h('div', { class: 'row between' }, h('h3', {}, `${sel.name} · ${used(sel.id)}/${sel.capacity}`),
       h('span', {}, h('button', { class: 'btn small', title: 'Închide', onclick: () => { selTable = ''; redraw(); } }, '✕'), ' ', h('button', { class: 'btn small', onclick: () => editTable(sel) }, '✎'), ' ',
         h('button', { class: 'btn small', onclick: async () => {
@@ -233,6 +245,6 @@ export function render(el) {
       h('button', { class: `btn ${moveMode ? 'primary' : ''}`, onclick: () => { moveMode = !moveMode; redraw(); } }, moveMode ? 'Mutare: ACTIVĂ' : 'Mută mesele'),
       h('span', { class: 'muted small' }, `${tables.reduce((s, t) => s + t.capacity, 0)} locuri, ${active.length - free.length} alocați`)),
     moveMode ? h('p', { class: 'muted small no-print' }, 'Mutare activă: trage mesele cu degetul. Dezactivează pentru a derula pagina.') : '',
-    h('div', { class: 'tbl-layout' }, h('div', { class: 'canvas-wrap' }, canvas), side),
+    h('div', { class: 'tbl-layout' }, h('div', { class: 'canvas-wrap' }, h('div', { class: 'canvas-scale', style: `width:${CW * S}px;height:${CH * S}px` }, canvas)), side),
     printList);
 }
