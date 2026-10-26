@@ -82,3 +82,16 @@ select.rsvp.confirmat { background:#e3f4e9; } select.rsvp.refuzat { background:#
 .stats.three { grid-template-columns:repeat(3,1fr); }
 @media (max-width:600px) { .stats.three .stat b { font-size:.95rem; } .stats.three .stat { padding:.4rem .2rem; } }
 .tlabel { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
+
+.tbl-layout { display:block; }
+.pitem { display:flex; flex-direction:column; padding:.45rem .6rem; border:1px solid var(--line); border-radius:8px; margin-bottom:.35rem; background:#fff; cursor:grab; user-select:none; }
+.pitem.sel { background:var(--accent); color:#fff; } .pitem.sel .muted { color:#fffc; }
+.plist { max-height:50dvh; overflow:auto; margin-top:.5rem; }
+.tbl-side { margin-bottom:1rem; }
+@media (min-width:900px) {
+  main { max-width:1500px; }
+  .tbl-layout { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:1rem; align-items:start; }
+  .tbl-layout .canvas-wrap { max-height:none; height:calc(100dvh - 230px); margin:0; }
+  .tbl-side { position:sticky; top:70px; margin:0; }
+  .plist { max-height:calc(100dvh - 400px); }
+}

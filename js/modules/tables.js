@@ -4,7 +4,7 @@ import { h, formModal, confirmDialog, modal, toast } from '../ui.js';
 const SHAPES = [['round', 'Rotundă'], ['rect', 'Dreptunghiulară'], ['honor', 'Masă de onoare']];
 const SIZE = { round: [110, 110], rect: [160, 80], honor: [260, 70] };
 export let noAutoRender = false;
-let selTable = '', selGuest = '', onRedraw = null, moveMode = false;
+let selTable = '', selGuest = '', onRedraw = null, moveMode = false, poolQ = '';
 
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ro', { numeric: true });
 const seated = id => data('guests').filter(g => g.tableId === id && g.rsvp !== 'refuzat');
@@ -48,12 +48,22 @@ async function assign(guestIds, tableId) {
   selGuest = '';
 }
 
-function assignGroup(gr) {
+function assignGroup(gr, presetTable) {
   const ids = data('guests').filter(g => g.groupId === gr.id && !g.tableId && g.rsvp !== 'refuzat').map(g => g.id);
   if (!ids.length) return toast('Nimeni nealocat în grup');
+  if (presetTable) return assign(ids, presetTable);
   formModal(`Alocă „${gr.name}” (${ids.length})`, [
     { name: 'tableId', label: 'Masa', type: 'select', options: data('tables').sort(byName).map(t => [t.id, `${t.name} (${used(t.id)}/${t.capacity})`]) }
   ], {}, v => assign(ids, v.tableId));
+}
+
+function pickGroup() {
+  const groups = data('groups').sort(byName).filter(g => data('guests').some(x => x.groupId === g.id && !x.tableId && x.rsvp !== 'refuzat'));
+  if (!groups.length) return toast('Niciun grup cu invitați nealocați');
+  formModal('Alocă un grup întreg', [
+    { name: 'groupId', label: 'Grup', type: 'select', options: groups.map(g => [g.id, g.name]) },
+    { name: 'tableId', label: 'Masa', type: 'select', options: data('tables').sort(byName).map(t => [t.id, `${t.name} (${used(t.id)}/${t.capacity})`]) }
+  ], {}, v => assignGroup(data('groups').find(g => g.id === v.groupId), v.tableId));
 }
 
 function pickGuests(t) {
@@ -161,19 +171,26 @@ export function render(el) {
     seated(sel.id).sort(byName).map(g => h('div', { class: 'grow' }, h('span', { class: 'ginfo' }, g.name),
       h('button', { class: 'btn small', onclick: () => update('guests', g.id, { tableId: '' }) }, 'Scoate')))) : null;
 
-  const chip = g => {
-    const c = h('div', { class: `chip ${g.id === selGuest ? 'sel' : ''}`, onclick: () => { selGuest = selGuest === g.id ? '' : g.id; redraw(); } }, g.name);
+  const gname = Object.fromEntries(groups.map(g => [g.id, g.name]));
+  const item = g => {
+    const c = h('div', { class: `pitem ${g.id === selGuest ? 'sel' : ''}`, onclick: () => { selGuest = selGuest === g.id ? '' : g.id; redraw(); } },
+      h('span', {}, g.name, g.kidsCount > 0 ? h('span', { class: 'tag' }, `+${g.kidsCount}`) : ''), h('span', { class: 'muted small' }, gname[g.groupId] || ''));
     c.addEventListener('pointerdown', e => dragGuest(e, g, c));
     return c;
   };
-  const pool = h('div', { class: 'card no-print' }, h('h3', {}, `Nealocați (${free.length})`),
-    selGuest ? h('p', { class: 'muted small' }, 'Atinge acum o masă ca să-l aloci.') : h('p', { class: 'muted small' }, 'Trage un invitat pe masă (mouse) sau atinge-l, apoi atinge masa.'),
-    [...groups.sort(byName), { id: '', name: 'Fără grup' }].map(gr => {
-      const m = free.filter(g => (g.groupId || '') === gr.id).sort(byName); if (!m.length) return null;
-      return h('div', {}, h('div', { class: 'row between' }, h('strong', {}, `${gr.name} (${m.length})`),
-        gr.id ? h('button', { class: 'btn small', onclick: () => assignGroup(gr) }, 'Alocă grupul') : null),
-        h('div', { class: 'chips' }, m.map(chip)));
-    }));
+  const listBox = h('div', { class: 'plist' });
+  const drawPool = () => {
+    const q = poolQ.toLowerCase();
+    const m = free.filter(g => !q || g.name.toLowerCase().includes(q) || (gname[g.groupId] || '').toLowerCase().includes(q)).sort(byName);
+    listBox.replaceChildren(...(m.length ? m.map(item) : [h('p', { class: 'muted small' }, 'Niciun invitat nealocat.')]));
+  };
+  const search = h('input', { type: 'search', placeholder: 'Caută nealocat…', value: poolQ, oninput: e => { poolQ = e.target.value; drawPool(); } });
+  const side = h('div', { class: 'card tbl-side no-print' },
+    h('div', { class: 'row between' }, h('h3', {}, `Nealocați (${free.length})`),
+      h('button', { class: 'btn small', onclick: pickGroup }, 'Alocă un grup')),
+    h('p', { class: 'muted small' }, selGuest ? 'Atinge acum o masă ca să-l aloci.' : 'Trage un nume pe masă (mouse) sau atinge-l, apoi atinge masa.'),
+    search, listBox);
+  drawPool();
 
   const printList = h('div', { class: 'print-only' }, h('h2', {}, 'Plan mese'),
     tables.map(t => h('div', { class: 'ptable' }, h('b', {}, `${t.name} (${used(t.id)}/${t.capacity})`), ': ', seated(t.id).sort(byName).map(g => g.name).join(', ') || '—')));
@@ -186,6 +203,6 @@ export function render(el) {
       h('button', { class: `btn ${moveMode ? 'primary' : ''}`, onclick: () => { moveMode = !moveMode; redraw(); } }, moveMode ? 'Mutare: ACTIVĂ' : 'Mută mesele'),
       h('span', { class: 'muted small' }, `${tables.reduce((s, t) => s + t.capacity, 0)} locuri, ${active.length - free.length} alocați`)),
     moveMode ? h('p', { class: 'muted small no-print' }, 'Mutare activă: trage mesele cu degetul. Dezactivează pentru a derula pagina.') : '',
-    h('div', { class: 'canvas-wrap' }, canvas),
-    h('div', { class: 'no-print' }, detail || '', pool), printList);
+    h('div', { class: 'tbl-layout' }, h('div', { class: 'canvas-wrap' }, canvas), side),
+    h('div', { class: 'no-print' }, detail || ''), printList);
 }
