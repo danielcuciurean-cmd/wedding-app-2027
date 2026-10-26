@@ -113,3 +113,8 @@ select.rsvp.confirmat { background:#e3f4e9; } select.rsvp.refuzat { background:#
   .plist { max-height:calc(100dvh - 385px); }
   .tbl-side { top:62px; }
 }
+
+.prow-move { cursor:grab; } select.mv { width:auto; max-width:70px; margin:0; padding:.2rem; font-size:.8rem; }
+.pop { onpointerdown:none; }
+
+.dragging-guest .pop { pointer-events:none; opacity:.35; }
