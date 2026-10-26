@@ -64,5 +64,11 @@ onAuth(user => {
 });
 
 if ('serviceWorker' in navigator) {
+  // Actualizare automată: când se activează un service worker nou, reîncarcă o singură dată.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+  });
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e)));
 }
