@@ -43,7 +43,7 @@ export function cleanup() { unsub?.(); unsub = null; }
 export function render(el) {
   cleanup();
   const groups = Object.fromEntries(data('groups').map(g => [g.id, g.name]));
-  const tot = h('div', { class: 'stats' });
+  const tot = h('div', { class: 'stats three' });
   const list = h('div', { class: 'card' });
   const extras = h('div', { class: 'card' });
 
