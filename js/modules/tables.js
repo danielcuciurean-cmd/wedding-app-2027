@@ -122,20 +122,26 @@ function dragTable(e, t, el) {
 
 // Drag cu mouse pentru invitați; pe touch: atingi invitatul, apoi masa.
 function dragGuest(e, g, chip) {
-  if (e.pointerType !== 'mouse' || e.button > 0) return;
-  const ghost = h('div', { class: 'ghost' }, g.name); document.body.append(ghost);
-  document.body.classList.add('dragging-guest'); // fereastra mesei devine transparentă ca să se poată lăsa numele pe mesele de sub ea
-  noAutoRender = true;
+  if (e.pointerType !== 'mouse' || e.button > 0 || e.target.closest('button, select, input')) return;
+  const sx = e.clientX, sy = e.clientY;
+  let ghost = null, moved = false;
   const pos = ev => { ghost.style.left = ev.clientX + 8 + 'px'; ghost.style.top = ev.clientY + 8 + 'px'; };
-  pos(e);
-  let moved = false;
-  const mv = ev => { moved = true; pos(ev); };
+  const mv = ev => {
+    if (!moved && Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 5) return; // click simplu, nu tragere
+    if (!moved) {
+      moved = true; noAutoRender = true;
+      ghost = h('div', { class: 'ghost' }, g.name); document.body.append(ghost);
+      document.body.classList.add('dragging-guest'); // fereastra mesei devine transparentă ca să se poată lăsa numele pe mesele de sub ea
+    }
+    pos(ev);
+  };
   const up = async ev => {
     removeEventListener('pointermove', mv); removeEventListener('pointerup', up);
+    if (!moved) return;
     const tgt = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-table]');
     ghost.remove(); noAutoRender = false; document.body.classList.remove('dragging-guest');
-    if (moved && tgt) await assign([g.id], tgt.dataset.table);
-    else if (moved) document.dispatchEvent(new Event('tables-redraw'));
+    if (tgt) await assign([g.id], tgt.dataset.table);
+    else document.dispatchEvent(new Event('tables-redraw'));
   };
   addEventListener('pointermove', mv); addEventListener('pointerup', up);
 }
@@ -188,8 +194,6 @@ export function render(el) {
       [['◀', -30, 0], ['▲', 0, -30], ['▼', 0, 30], ['▶', 30, 0]].map(([l, dx, dy]) => h('button', { class: 'btn small', onclick: () => nudge(sel, dx, dy) }, l))),
     seated(sel.id).sort(byName).map(g => {
       const row = h('div', { class: `grow prow-move ${g.rsvp === 'confirmat' ? 'okrow' : ''}`, title: 'Trage pe altă masă ca să muți' }, confirmBox(g), h('span', { class: 'ginfo' }, g.name, g.kidsCount > 0 ? h('span', { class: 'tag' }, `+${g.kidsCount}`) : ''),
-        h('select', { class: 'mv', title: 'Mută la altă masă', onchange: e => e.target.value && assign([g.id], e.target.value) },
-          h('option', { value: '' }, '⇄'), tables.filter(x => x.id !== sel.id).map(x => h('option', { value: x.id }, `${x.name} (${used(x.id)}/${x.capacity})`))),
         h('button', { class: 'btn small', onclick: () => update('guests', g.id, { tableId: '' }) }, 'Scoate'));
       row.addEventListener('pointerdown', e => dragGuest(e, g, row));
       return row;
