@@ -25,6 +25,7 @@ async function route() {
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.path === r.path));
   current?.cleanup?.(); unsubRender?.();
   const view = $('#view');
+  view.className = '';
   view.replaceChildren(h('p', { class: 'muted' }, 'Se încarcă…'));
   try {
     const mod = await r.load();

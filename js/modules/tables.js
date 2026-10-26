@@ -143,6 +143,7 @@ export function render(el) {
   const active = guests.filter(g => g.rsvp !== 'refuzat');
   const free = active.filter(g => !g.tableId || !tables.some(t => t.id === g.tableId));
   const redraw = () => render(el);
+  el.classList.add('wide');
   cleanup();
   onRedraw = () => { cleanup(); redraw(); };
   document.addEventListener('tables-redraw', onRedraw);
@@ -162,9 +163,10 @@ export function render(el) {
   }));
 
   const sel = tables.find(t => t.id === selTable);
-  const detail = sel ? h('div', { class: 'card' },
+  const selSize = sel ? (SIZE[sel.shape] || SIZE.round) : [0, 0];
+  const detail = sel ? h('div', { class: 'card pop no-print', style: `left:${(sel.x || 0) + selSize[0] + 14}px;top:${sel.y || 0}px`, onpointerdown: e => e.stopPropagation() },
     h('div', { class: 'row between' }, h('h3', {}, `${sel.name} · ${used(sel.id)}/${sel.capacity}`),
-      h('span', {}, h('button', { class: 'btn small', onclick: () => editTable(sel) }, '✎'), ' ',
+      h('span', {}, h('button', { class: 'btn small', title: 'Închide', onclick: () => { selTable = ''; redraw(); } }, '✕'), ' ', h('button', { class: 'btn small', onclick: () => editTable(sel) }, '✎'), ' ',
         h('button', { class: 'btn small', onclick: async () => {
           if (!await confirmDialog(`Ștergi masa „${sel.name}”? Invitații vor deveni nealocați.`)) return;
           await batch([...guests.filter(g => g.tableId === sel.id).map(g => ({ type: 'update', col: 'guests', id: g.id, data: { tableId: '' } })),
@@ -178,6 +180,7 @@ export function render(el) {
     seated(sel.id).sort(byName).map(g => h('div', { class: `grow ${g.rsvp === 'confirmat' ? 'okrow' : ''}` }, confirmBox(g), h('span', { class: 'ginfo' }, g.name, g.kidsCount > 0 ? h('span', { class: 'tag' }, `+${g.kidsCount}`) : ''),
       h('button', { class: 'btn small', onclick: () => update('guests', g.id, { tableId: '' }) }, 'Scoate')))) : null;
 
+  if (detail) canvas.append(detail);
   const gname = Object.fromEntries(groups.map(g => [g.id, g.name]));
   const item = g => {
     const c = h('div', { class: `pitem ${g.id === selGuest ? 'sel' : ''} ${g.rsvp === 'confirmat' ? 'okrow' : ''}`, onclick: () => { selGuest = selGuest === g.id ? '' : g.id; redraw(); } },
@@ -211,5 +214,5 @@ export function render(el) {
       h('span', { class: 'muted small' }, `${tables.reduce((s, t) => s + t.capacity, 0)} locuri, ${active.length - free.length} alocați`)),
     moveMode ? h('p', { class: 'muted small no-print' }, 'Mutare activă: trage mesele cu degetul. Dezactivează pentru a derula pagina.') : '',
     h('div', { class: 'tbl-layout' }, h('div', { class: 'canvas-wrap' }, canvas), side),
-    h('div', { class: 'no-print' }, detail || ''), printList);
+    printList);
 }
