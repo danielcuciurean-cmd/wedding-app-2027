@@ -43,3 +43,22 @@ h3 { margin:.1rem 0 .5rem; }
 .tag { font-size:.7rem; background:var(--line); border-radius:99px; padding:.05rem .45rem; margin-left:.4rem; }
 select.rsvp { width:auto; margin:0; padding:.3rem; font-size:.85rem; }
 select.rsvp.confirmat { background:#e3f4e9; } select.rsvp.refuzat { background:#fbe4e2; }
+.canvas-wrap { overflow:auto; border:1px solid var(--line); border-radius:12px; background:#fff; margin:.8rem 0; max-height:60dvh; }
+.canvas { position:relative; width:1200px; height:800px; background-image:radial-gradient(var(--line) 1px, transparent 1px); background-size:24px 24px; }
+.tbl { position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f6e9ec; border:2px solid var(--accent); touch-action:none; cursor:grab; user-select:none; text-align:center; font-size:.85rem; }
+.tbl.round { border-radius:50%; } .tbl.rect { border-radius:8px; } .tbl.honor { border-radius:8px; background:#f1dfa8; }
+.tbl.sel { box-shadow:0 0 0 3px var(--accent); } .tbl.over { border-color:var(--err); background:#fbe4e2; }
+.chips { display:flex; flex-wrap:wrap; gap:.35rem; margin:.4rem 0 .8rem; }
+.chip { padding:.25rem .6rem; border:1px solid var(--line); border-radius:99px; background:#fff; cursor:grab; user-select:none; }
+.chip.sel { background:var(--accent); color:#fff; }
+.ghost { position:fixed; z-index:50; pointer-events:none; background:var(--accent); color:#fff; padding:.25rem .6rem; border-radius:99px; }
+.print-only { display:none; }
+@media print { .print-only { display:block; } .canvas-wrap { max-height:none; overflow:visible; border:0; } .canvas { zoom:.7; } .ptable { margin:.2rem 0; } }
+.bar { height:8px; background:var(--line); border-radius:99px; overflow:hidden; } .bar > i { display:block; height:100%; background:var(--accent); } .bar.over > i { background:var(--err); }
+.pay { display:flex; gap:.5rem; align-items:center; padding:.3rem 0; border-top:1px dashed var(--line); font-size:.9rem; }
+.pill { font-size:.72rem; border-radius:99px; padding:.05rem .5rem; background:var(--line); } .pill.ok { background:#e3f4e9; } .pill.warn { background:#fbe4e2; }
+.tabs { display:flex; gap:.4rem; margin-bottom:.8rem; flex-wrap:wrap; }
+.tabs .btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.task.done .ginfo { text-decoration:line-through; color:var(--muted); }
+.late { color:var(--err); }
+.big { font-size:2.2rem; color:var(--accent); font-weight:700; }
